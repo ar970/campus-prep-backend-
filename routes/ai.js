@@ -127,22 +127,69 @@ Return ONLY valid JSON:
 });
 
 // ── POST /api/ai/generate-report ──
-// Body: { name, role, difficulty, techAvg, hrAvg, faceAvg, overall, faceInfo, transcript }
+// Body: { name, role, college, difficulty, techAvg, hrAvg, faceAvg, overall,
+//         commAvg, relAvg, depthAvg, faceInfo, techCount, hrCount,
+//         worstAnswers, bestAnswers, resumeSnippet }
 router.post('/generate-report', async (req, res) => {
   try {
-    const { name, role, difficulty, techAvg, hrAvg, faceAvg, overall, faceInfo, techCount, hrCount } = req.body;
+    const {
+      name, role, college, difficulty,
+      techAvg, hrAvg, faceAvg, overall,
+      commAvg, relAvg, depthAvg,
+      faceInfo, techCount, hrCount,
+      worstAnswers, bestAnswers, resumeSnippet
+    } = req.body;
 
-    const prompt = `Campus interview complete for ${name} applying to ${role}. Difficulty: ${difficulty}.
-Technical: ${techAvg}/100 (${techCount} Qs). HR: ${hrAvg}/100 (${hrCount} Qs). Face: ${faceAvg}/100. Overall: ${overall}/100.
+    const prompt = `You are a senior campus recruiter writing a final performance report.
+
+CANDIDATE: ${name}
+ROLE APPLIED: ${role}
+COLLEGE: ${college || 'Not specified'}
+DIFFICULTY: ${difficulty}
+
+SCORES:
+- Technical: ${techAvg}/100 (${techCount} questions)
+- HR: ${hrAvg}/100 (${hrCount} questions)
+- Communication: ${commAvg || '—'}/100
+- Relevance: ${relAvg || '—'}/100
+- Depth: ${depthAvg || '—'}/100
+- Face/Presence: ${faceAvg}/100
+- Overall: ${overall}/100
 ${faceInfo || 'No camera data.'}
+
+RESUME BACKGROUND (use this to tailor the action plan to their actual field):
+${resumeSnippet || 'Not provided.'}
+
+WEAKEST ANSWERS (where they struggled — use these for specific action steps):
+${worstAnswers || 'No weak answers recorded.'}
+
+STRONGEST ANSWERS (what they did well):
+${bestAnswers || 'No strong answers recorded.'}
+
+VERDICT RULES:
+- "Strong Hire": Overall 80+, Technical 75+, HR 70+
+- "Hire": Overall 65+, Technical 60+
+- "Borderline": Overall 45-64 OR Technical below 50
+- "Not Ready": Overall below 45 OR Technical below 35
+- If technical below 40 → verdict CANNOT be Hire or Strong Hire
+
+ACTION PLAN RULES — most important section:
+- Each step MUST be specific to this candidate's actual weak answers and their resume/field
+- Reference their actual projects, skills, topics, or role by name
+- NEVER write generic advice like "practice more" or "revise core concepts"
+- BAD: "Practice answering technical questions clearly"
+- GOOD: "You struggled to explain your Django project — write a 2-minute verbal pitch of what it does, the tech stack used, and one real challenge you solved. Say it out loud daily until it's fluent."
+- GOOD: "Your SQL joins answer was vague — revise INNER, LEFT, RIGHT, and FULL joins with examples from your internship data and practise explaining when you'd use each one."
+- Steps must be immediately actionable this week, not vague long-term advice.
+
 Return ONLY valid JSON:
-{"verdict":"<Strong Hire|Hire|Borderline|Not Ready>","quote":"<2 sentence editorial-style overall assessment>","tech":"<2 sentences on technical performance>","hr":"<2 sentences on HR performance>","face":"<1 sentence on body language/presence>","s1":"<specific action step 1>","s2":"<specific action step 2>","s3":"<specific action step 3>"}`;
+{"verdict":"<Strong Hire|Hire|Borderline|Not Ready>","quote":"<2 sentences direct honest assessment mentioning their specific role and actual performance>","tech":"<2 sentences on technical performance with specific topics they got right or wrong>","hr":"<2 sentences on communication and HR with specifics from their answers>","face":"<1 sentence on body language and confidence>","s1":"<specific action step tied to their weakest answer — name the actual topic or project>","s2":"<specific action step for second biggest gap — a concrete daily task>","s3":"<specific step for third gap OR a strength to reinforce before real interviews>"}`;
 
     const completion = await groq.chat.completions.create({
       model: 'llama-3.3-70b-versatile',
       messages: [{ role: 'user', content: prompt }],
-      temperature: 0.7,
-      max_tokens: 800,
+      temperature: 0.4,
+      max_tokens: 1000,
       response_format: { type: 'json_object' }
     });
 
