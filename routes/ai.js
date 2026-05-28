@@ -43,26 +43,14 @@ router.post('/generate-questions', async (req, res) => {
       hard: 'Ask tough, probing questions. Be direct. Always add a follow-up.'
     }[difficulty] || 'Ask professional questions.';
 
-    const prompt = `You are a strict senior campus interviewer for "${role}".
-Candidate: ${name}, college: ${college || 'India'}.
+    const prompt = `You are a campus recruiter.
+Candidate: ${name}, applying for: "${role}", college: ${college || 'India'}.
 Difficulty: ${difficulty}. ${diffDesc}
 Resume: ${(resumeText || '').substring(0, 2500)}
 
 Generate exactly ${qPer} TECHNICAL questions and ${qPer} HR questions.
-
-TECHNICAL RULES — follow strictly:
-1. Cover a WIDE range — do NOT fixate on just 1-2 resume points
-2. Include a MIX of: fundamentals (DS/OOP/DBMS/OS), resume project deep-dive, role-specific concepts, a tradeoff/decision question, and a gap-probe (something they listed but may not know deeply)
-3. Each question must test something DIFFERENT — no overlapping themes
-4. Make every question specific to "${role}" — not generic filler
-5. Vary question types: explain, compare, debug, design, justify a decision
-
-HR RULES:
-1. Cover: self-introduction, strength with example, weakness honestly, challenge overcome, situational judgment
-2. At least 1 question must reference their specific resume background
-3. No repeated themes across HR questions
-4. Last HR question must be exactly: "Do you have any questions for us?"
-
+TECHNICAL: reference specific resume projects/skills. Be role-specific.
+HR: include tell me about yourself, strengths, situational. Last HR question must be: "Do you have any questions for us?"
 Return ONLY valid JSON: {"tech":["q1","q2"...],"hr":["q1","q2"...]}`;
 
     const completion = await groq.chat.completions.create({
