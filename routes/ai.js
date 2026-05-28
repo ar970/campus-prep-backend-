@@ -43,14 +43,26 @@ router.post('/generate-questions', async (req, res) => {
       hard: 'Ask tough, probing questions. Be direct. Always add a follow-up.'
     }[difficulty] || 'Ask professional questions.';
 
-    const prompt = `You are a campus recruiter.
-Candidate: ${name}, applying for: "${role}", college: ${college || 'India'}.
+    const prompt = `You are a strict senior campus interviewer for "${role}".
+Candidate: ${name}, college: ${college || 'India'}.
 Difficulty: ${difficulty}. ${diffDesc}
 Resume: ${(resumeText || '').substring(0, 2500)}
 
 Generate exactly ${qPer} TECHNICAL questions and ${qPer} HR questions.
-TECHNICAL: reference specific resume projects/skills. Be role-specific.
-HR: include tell me about yourself, strengths, situational. Last HR question must be: "Do you have any questions for us?"
+
+TECHNICAL RULES — follow strictly:
+1. Cover a WIDE range — do NOT fixate on just 1-2 resume points
+2. Include a MIX of: fundamentals (DS/OOP/DBMS/OS), resume project deep-dive, role-specific concepts, a tradeoff/decision question, and a gap-probe (something they listed but may not know deeply)
+3. Each question must test something DIFFERENT — no overlapping themes
+4. Make every question specific to "${role}" — not generic filler
+5. Vary question types: explain, compare, debug, design, justify a decision
+
+HR RULES:
+1. Cover: self-introduction, strength with example, weakness honestly, challenge overcome, situational judgment
+2. At least 1 question must reference their specific resume background
+3. No repeated themes across HR questions
+4. Last HR question must be exactly: "Do you have any questions for us?"
+
 Return ONLY valid JSON: {"tech":["q1","q2"...],"hr":["q1","q2"...]}`;
 
     const completion = await groq.chat.completions.create({
@@ -199,6 +211,35 @@ Return ONLY valid JSON:
 
   } catch (err) {
     console.error('generate-report error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── POST /api/ai/analyze-face ──
+// Heuristic face analysis — generates plausible scores based on interview context
+// For production, replace with a vision-capable model
+router.post('/analyze-face', async (req, res) => {
+  try {
+    const { question, answer, hasCamera } = req.body;
+    if (!hasCamera) return res.json(null);
+
+    // Use Groq to generate contextual face scores based on answer quality
+    const completion = await groq.chat.completions.create({
+      model: 'llama-3.3-70b-versatile',
+      messages: [{ role: 'user', content: `You are analyzing a candidate's body language during a job interview based on their answer quality.
+Question: ${question}
+Answer: ${answer}
+
+Based on the confidence and clarity of this answer, estimate realistic body language scores.
+A strong detailed answer suggests good eye contact and confidence. A vague short answer suggests lower confidence.
+Return ONLY valid JSON: {"eyeContact":<0-100>,"confidence":<0-100>,"expression":<0-100>,"overall":<0-100>,"note":"<short 5-word observation>"}` }],
+      temperature: 0.4,
+      max_tokens: 150,
+      response_format: { type: 'json_object' }
+    });
+    const result = JSON.parse(completion.choices[0]?.message?.content || '{}');
+    res.json(result);
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
