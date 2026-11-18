@@ -4,6 +4,10 @@ const Groq = require('groq-sdk');
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
+// Model is configurable from Render env vars, so the next Groq deprecation
+// only needs an env change, not a code change.
+const MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
+
 // ── POST /api/ai/chat ──
 // Body: { messages: [...], responseFormat: 'json' | 'text' }
 // All Gemini calls from the frontend now come here instead
@@ -15,10 +19,11 @@ router.post('/chat', async (req, res) => {
     }
 
     const completion = await groq.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
+      model: MODEL,
+      reasoning_effort: 'low',
       messages,
       temperature: 0.7,
-      max_tokens: 1024,
+      max_tokens: 2048,
       ...(responseFormat === 'json' ? { response_format: { type: 'json_object' } } : {})
     });
 
@@ -54,10 +59,11 @@ HR: include tell me about yourself, strengths, situational. Last HR question mus
 Return ONLY valid JSON: {"tech":["q1","q2"...],"hr":["q1","q2"...]}`;
 
     const completion = await groq.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
+      model: MODEL,
+      reasoning_effort: 'low',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.8,
-      max_tokens: 1500,
+      max_tokens: 3000,
       response_format: { type: 'json_object' }
     });
 
@@ -109,10 +115,11 @@ Return ONLY valid JSON:
 {"score":<0-100>,"communication":<0-100>,"relevance":<0-100>,"depth":<0-100>,"feedback":"<1 blunt honest sentence about what was weak or strong>","reaction":"<2-4 word natural interviewer reaction>","followUp":"<a probing follow-up question if the answer was vague or incomplete, else empty string>"}`;
 
     const completion = await groq.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
+      model: MODEL,
+      reasoning_effort: 'low',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.3, // lower temp = more consistent, less random generosity
-      max_tokens: 512,
+      max_tokens: 1500,
       response_format: { type: 'json_object' }
     });
 
@@ -186,10 +193,11 @@ Return ONLY valid JSON:
 {"verdict":"<Strong Hire|Hire|Borderline|Not Ready>","quote":"<2 sentences direct honest assessment mentioning their specific role and actual performance>","tech":"<2 sentences on technical performance with specific topics they got right or wrong>","hr":"<2 sentences on communication and HR with specifics from their answers>","face":"<1 sentence on body language and confidence>","s1":"<specific action step tied to their weakest answer — name the actual topic or project>","s2":"<specific action step for second biggest gap — a concrete daily task>","s3":"<specific step for third gap OR a strength to reinforce before real interviews>"}`;
 
     const completion = await groq.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
+      model: MODEL,
+      reasoning_effort: 'low',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.4,
-      max_tokens: 1000,
+      max_tokens: 2500,
       response_format: { type: 'json_object' }
     });
 
@@ -213,7 +221,8 @@ router.post('/analyze-face', async (req, res) => {
 
     // Use Groq to generate contextual face scores based on answer quality
     const completion = await groq.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
+      model: MODEL,
+      reasoning_effort: 'low',
       messages: [{ role: 'user', content: `You are analyzing a candidate's body language during a job interview based on their answer quality.
 Question: ${question}
 Answer: ${answer}
@@ -222,7 +231,7 @@ Based on the confidence and clarity of this answer, estimate realistic body lang
 A strong detailed answer suggests good eye contact and confidence. A vague short answer suggests lower confidence.
 Return ONLY valid JSON: {"eyeContact":<0-100>,"confidence":<0-100>,"expression":<0-100>,"overall":<0-100>,"note":"<short 5-word observation>"}` }],
       temperature: 0.4,
-      max_tokens: 150,
+      max_tokens: 800,
       response_format: { type: 'json_object' }
     });
     const result = JSON.parse(completion.choices[0]?.message?.content || '{}');
