@@ -48,14 +48,26 @@ router.post('/generate-questions', async (req, res) => {
       hard: 'Ask tough, probing questions. Be direct. Always add a follow-up.'
     }[difficulty] || 'Ask professional questions.';
 
-    const prompt = `You are a campus recruiter.
-Candidate: ${name}, applying for: "${role}", college: ${college || 'India'}.
+    const prompt = `You are a campus recruiter interviewing ${name} for the role of "${role}". College: ${college || 'India'}.
+Every question must help you decide one thing: is this candidate ready for THIS role?
 Difficulty: ${difficulty}. ${diffDesc}
 Resume: ${(resumeText || '').substring(0, 2500)}
 
+First, silently work out the main skills a "${role}" is tested on in real campus interviews. If it is not a coding role (design, marketing, sales, finance, HR, consulting, etc.), "technical" means the core skills of that role, not programming.
+
 Generate exactly ${qPer} TECHNICAL questions and ${qPer} HR questions.
-TECHNICAL: reference specific resume projects/skills. Be role-specific.
-HR: include tell me about yourself, strengths, situational. Last HR question must be: "Do you have any questions for us?"
+
+TECHNICAL:
+- Each question tests a skill the "${role}" actually needs. Cover different skills.
+- Use the resume as evidence: when a project or skill is relevant, ask about it in terms of the role (e.g. "You built X. How would that help you as a ${role}?").
+- If the resume shows nothing for a skill the role needs, ask about that skill directly, so the gap shows.
+- Never ask about a resume item that has nothing to do with the role.
+
+HR:
+- Include: tell me about yourself, why you want to be a ${role}, a strength with an example, and a situation someone in this role would really face.
+- Last HR question must be exactly: "Do you have any questions for us?"
+
+Every question must sound like a real interviewer said it: short, clear, one question at a time, answerable out loud in under 2 minutes.
 Return ONLY valid JSON: {"tech":["q1","q2"...],"hr":["q1","q2"...]}`;
 
     const completion = await groq.chat.completions.create({
