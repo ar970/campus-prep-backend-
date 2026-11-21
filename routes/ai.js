@@ -223,6 +223,66 @@ Return ONLY valid JSON:
   }
 });
 
+// ── POST /api/ai/resume-ats ──
+// Body: { role, resumeText, jobDescription? }
+// Checks a resume like an ATS would for one role, and rebuilds it in an ATS-friendly format.
+// Groq free tier = 8K tokens/minute (input + max_tokens), so input is capped and max_tokens kept at 4500.
+router.post('/resume-ats', async (req, res) => {
+  try {
+    const { role, resumeText, jobDescription } = req.body;
+    if (!role || !resumeText || resumeText.trim().length < 80) {
+      return res.status(400).json({ error: 'Please give a target role and a resume with readable text.' });
+    }
+    const jd = (jobDescription || '').trim().substring(0, 1500);
+
+    const prompt = `You are an ATS (applicant tracking system) expert and campus recruiter in India.
+Check this resume for the role "${role}".
+${jd ? `Job description:\n${jd}\n` : ''}
+Resume text (extracted from a PDF, so layout is lost):
+${resumeText.substring(0, 5000)}
+
+TASKS
+1. Keywords: list the skills, tools and terms an ATS for "${role}" would scan for${jd ? ' (take them from the job description)' : ''}. Split into ones the resume HAS and ones it is MISSING. Up to 10 each, 1-3 words each.
+2. Score "impact" 0-100 (do bullets start with action verbs and show results or numbers?) and "readability" 0-100 (concise, consistent, no long paragraphs, no "I/my").
+3. List the top issues, max 5, most important first, each with a concrete fix.
+4. Rewrite up to 3 weak bullet points from the resume to be stronger.
+5. Rebuild the whole resume as clean ATS-friendly data, tailored to "${role}", with the most role-relevant items first.
+
+HONESTY RULES (very important):
+- Never invent experience, employers, dates, grades, numbers or skills that are not in the resume.
+- Where a number would help but is not given, write "[add number]" so the student fills it in.
+- You may reorder, rephrase and tighten wording.
+- Do not put missing keywords into the rebuilt resume unless the resume already shows that skill.
+
+Return ONLY valid JSON in exactly this shape:
+{"impact":0,"readability":0,"verdict":"<one blunt sentence on how this resume would do in an ATS for this role>",
+"presentKeywords":[""],"missingKeywords":[""],
+"issues":[{"severity":"high|medium|low","issue":"","fix":""}],
+"bulletRewrites":[{"before":"","after":""}],
+"resume":{"name":"","email":"","phone":"","linkedin":"","github":"","location":"","summary":"<2 lines tailored to ${role}, only from real facts>",
+"education":[{"degree":"","institution":"","dates":"","score":""}],
+"experience":[{"title":"","organization":"","dates":"","bullets":[""]}],
+"projects":[{"name":"","tech":"","bullets":[""]}],
+"skills":[{"category":"","items":[""]}],
+"certifications":[""],"achievements":[""]}}`;
+
+    const completion = await groq.chat.completions.create({
+      model: MODEL,
+      reasoning_effort: 'low',
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.2,
+      max_tokens: 4500,
+      response_format: { type: 'json_object' }
+    });
+    const result = JSON.parse(completion.choices[0]?.message?.content || '{}');
+    res.json({ result });
+  } catch (err) {
+    console.error('resume-ats error:', err.message);
+    const busy = err.status === 429 || err.status === 413;
+    res.status(busy ? 429 : 500).json({ error: busy ? 'The AI is busy right now. Wait one minute and try again.' : err.message });
+  }
+});
+
 // ── POST /api/ai/analyze-face ──
 // Heuristic face analysis — generates plausible scores based on interview context
 // For production, replace with a vision-capable model
